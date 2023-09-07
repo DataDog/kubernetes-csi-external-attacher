@@ -237,6 +237,14 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, UnspecifiedValue, pv.Spec.GCEPersistentDisk.PDName)
 	}
 
+	if pv.Spec.ClaimRef != nil && strings.Contains(pv.Spec.ClaimRef.Name, "statefulset-test-in-tree") {
+		var err error
+		volID, err = g.RepairVolumeHandle(volID, "projects/datadog-staging/zones/europe-west3-a/instances/eu1-staging-dog-muk-k8s-fec52a2a97321c60-vb4b")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	gceSource := pv.Spec.PersistentVolumeSource.GCEPersistentDisk
 
 	partition := ""

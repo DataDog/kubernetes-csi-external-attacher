@@ -1,6 +1,6 @@
 ARG BASE_IMAGE
 
-FROM golang:1.20 as builder
+FROM registry.ddbuild.io/images/mirror/golang:1.20 as builder
 WORKDIR /go/src/kubernetes-csi/external-attacher
 ADD . .
 ENV GOFLAGS="-buildvcs=false"
