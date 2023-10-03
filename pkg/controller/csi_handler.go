@@ -424,6 +424,7 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 
 	var csiSource *v1.CSIPersistentVolumeSource
 	var pvSpec *v1.PersistentVolumeSpec
+	var oldPv *v1.PersistentVolume
 	var pv *v1.PersistentVolume
 	var migratable bool
 	if va.Spec.Source.PersistentVolumeName != nil {
@@ -445,6 +446,7 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 		}
 
 		if h.translator.IsPVMigratable(pv) {
+			oldPv = pv.DeepCopy()
 			pv, err = h.translator.TranslateInTreePVToCSI(pv)
 			if err != nil {
 				return va, nil, fmt.Errorf("failed to translate in tree pv to CSI: %v", err)
@@ -512,9 +514,10 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 			return va, nil, err
 		}
 		copy.Spec.GCEPersistentDisk = nil
+		klog.V(4).Infof("[DEBUG] %q", oldPv)
 		klog.V(4).Infof("[DEBUG] %q", copy)
 
-		_, err = h.patchPV(pv, copy)
+		_, err = h.patchPV(oldPv, copy)
 		if err != nil {
 			klog.V(4).Infof("[DEBUG] %q", err.Error())
 		}
