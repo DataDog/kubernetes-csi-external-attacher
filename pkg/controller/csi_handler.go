@@ -506,6 +506,7 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 	// klog.V(4).Infof("[DEBUG] %q", pv.Spec.ClaimRef.Namespace)
 
 	if pv != nil && pv.Spec.ClaimRef.Namespace == "baptiste-pvc" {
+		pv.Spec.GCEPersistentDisk = nil
 		copy := pv.DeepCopy()
 		copy.Spec.CSI.VolumeHandle, err = h.translator.RepairVolumeHandle("pd.csi.storage.gke.io", volumeHandle, nodeID)
 		if err != nil {
