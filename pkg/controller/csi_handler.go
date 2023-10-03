@@ -502,12 +502,16 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 		return va, nil, err
 	}
 
+	klog.V(4).Infof("[DEBUG] %q", pv)
+	// klog.V(4).Infof("[DEBUG] %q", pv.Spec.ClaimRef.Namespace)
+
 	if pv != nil && pv.Spec.ClaimRef.Namespace == "baptiste-pvc" {
 		copy := pv.DeepCopy()
 		copy.Spec.CSI.VolumeHandle, err = h.translator.RepairVolumeHandle("pd.csi.storage.gke.io", volumeHandle, nodeID)
 		if err != nil {
 			return va, nil, err
 		}
+		klog.V(4).Infof("[DEBUG] %q", copy.Spec.CSI.VolumeHandle)
 
 		h.patchPV(pv, copy)
 	}
