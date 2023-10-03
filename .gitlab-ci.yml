@@ -11,3 +11,4 @@ build-docker-image:
   variables:
     IMAGE_NAME: csi-attacher
   extends: .build-docker-image
+  when: always

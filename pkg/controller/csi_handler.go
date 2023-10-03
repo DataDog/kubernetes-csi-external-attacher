@@ -424,12 +424,14 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 
 	var csiSource *v1.CSIPersistentVolumeSource
 	var pvSpec *v1.PersistentVolumeSpec
+	var pv *v1.PersistentVolume
 	var migratable bool
 	if va.Spec.Source.PersistentVolumeName != nil {
 		if va.Spec.Source.InlineVolumeSpec != nil {
 			return va, nil, errors.New("both InlineCSIVolumeSource and PersistentVolumeName specified in VA source")
 		}
-		pv, err := h.pvLister.Get(*va.Spec.Source.PersistentVolumeName)
+		var err error
+		pv, err = h.pvLister.Get(*va.Spec.Source.PersistentVolumeName)
 		if err != nil {
 			return va, nil, err
 		}
@@ -498,6 +500,16 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 	nodeID, err := h.getNodeID(h.attacherName, va.Spec.NodeName, nil)
 	if err != nil {
 		return va, nil, err
+	}
+
+	if pv != nil && pv.Spec.ClaimRef.Namespace == "baptiste-pvc" {
+		copy := pv.DeepCopy()
+		copy.Spec.CSI.VolumeHandle, err = h.translator.RepairVolumeHandle("pd.csi.storage.gke.io", volumeHandle, nodeID)
+		if err != nil {
+			return va, nil, err
+		}
+
+		h.patchPV(pv, copy)
 	}
 
 	originalVA := va
