@@ -513,7 +513,10 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 		}
 		klog.V(4).Infof("[DEBUG] %q", copy.Spec.CSI.VolumeHandle)
 
-		h.patchPV(pv, copy)
+		_, err = h.patchPV(pv, copy)
+		if err != nil {
+			klog.V(4).Infof("[DEBUG] %q", err.Error())
+		}
 	}
 
 	originalVA := va
