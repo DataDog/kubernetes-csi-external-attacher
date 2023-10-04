@@ -424,15 +424,12 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 
 	var csiSource *v1.CSIPersistentVolumeSource
 	var pvSpec *v1.PersistentVolumeSpec
-	var oldPv *v1.PersistentVolume
-	var pv *v1.PersistentVolume
 	var migratable bool
 	if va.Spec.Source.PersistentVolumeName != nil {
 		if va.Spec.Source.InlineVolumeSpec != nil {
 			return va, nil, errors.New("both InlineCSIVolumeSource and PersistentVolumeName specified in VA source")
 		}
-		var err error
-		pv, err = h.pvLister.Get(*va.Spec.Source.PersistentVolumeName)
+		pv, err := h.pvLister.Get(*va.Spec.Source.PersistentVolumeName)
 		if err != nil {
 			return va, nil, err
 		}
@@ -446,7 +443,6 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 		}
 
 		if h.translator.IsPVMigratable(pv) {
-			oldPv = pv.DeepCopy()
 			pv, err = h.translator.TranslateInTreePVToCSI(pv)
 			if err != nil {
 				return va, nil, fmt.Errorf("failed to translate in tree pv to CSI: %v", err)
@@ -504,25 +500,6 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 		return va, nil, err
 	}
 
-	klog.V(4).Infof("[DEBUG] %q", pv)
-	// klog.V(4).Infof("[DEBUG] %q", pv.Spec.ClaimRef.Namespace)
-
-	if pv != nil && pv.Spec.ClaimRef.Namespace == "baptiste-pvc" {
-		copy := pv.DeepCopy()
-		copy.Spec.CSI.VolumeHandle, err = h.translator.RepairVolumeHandle("pd.csi.storage.gke.io", volumeHandle, nodeID)
-		if err != nil {
-			return va, nil, err
-		}
-		copy.Spec.GCEPersistentDisk = nil
-		klog.V(4).Infof("[DEBUG] %q", oldPv)
-		klog.V(4).Infof("[DEBUG] %q", copy)
-
-		_, err = h.patchPV(oldPv, copy)
-		if err != nil {
-			klog.V(4).Infof("[DEBUG] %q", err.Error())
-		}
-	}
-
 	originalVA := va
 	va, finalizerAdded := h.prepareVAFinalizer(va)
 	va, nodeIDAdded := h.prepareVANodeID(va, nodeID)
@@ -549,15 +526,19 @@ func (h *csiHandler) csiAttach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 func (h *csiHandler) csiDetach(va *storage.VolumeAttachment) (*storage.VolumeAttachment, error) {
 	var csiSource *v1.CSIPersistentVolumeSource
 	var migratable bool
+	var oldPv *v1.PersistentVolume
+	var pv *v1.PersistentVolume
 	if va.Spec.Source.PersistentVolumeName != nil {
 		if va.Spec.Source.InlineVolumeSpec != nil {
 			return va, errors.New("both InlineCSIVolumeSource and PersistentVolumeName specified in VA source")
 		}
-		pv, err := h.pvLister.Get(*va.Spec.Source.PersistentVolumeName)
+		var err error
+		pv, err = h.pvLister.Get(*va.Spec.Source.PersistentVolumeName)
 		if err != nil {
 			return va, err
 		}
 		if h.translator.IsPVMigratable(pv) {
+			oldPv = pv.DeepCopy()
 			pv, err = h.translator.TranslateInTreePVToCSI(pv)
 			if err != nil {
 				return va, fmt.Errorf("failed to translate in tree pv to CSI: %v", err)
@@ -590,6 +571,24 @@ func (h *csiHandler) csiDetach(va *storage.VolumeAttachment) (*storage.VolumeAtt
 	nodeID, err := h.getNodeID(h.attacherName, va.Spec.NodeName, va)
 	if err != nil {
 		return va, err
+	}
+
+	klog.V(4).Infof("[DEBUG] %q", pv)
+
+	if pv != nil && pv.Spec.ClaimRef.Namespace == "baptiste-pvc" {
+		copy := pv.DeepCopy()
+		copy.Spec.CSI.VolumeHandle, err = h.translator.RepairVolumeHandle("pd.csi.storage.gke.io", volumeHandle, nodeID)
+		if err != nil {
+			return va, err
+		}
+		copy.Spec.GCEPersistentDisk = nil
+		klog.V(4).Infof("[DEBUG] %q", oldPv)
+		klog.V(4).Infof("[DEBUG] %q", copy)
+
+		_, err = h.patchPV(oldPv, copy)
+		if err != nil {
+			klog.V(4).Infof("[DEBUG] %q", err.Error())
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), h.timeout)
