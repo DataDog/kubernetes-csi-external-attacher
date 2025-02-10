@@ -5,7 +5,6 @@ FROM $BUILDER_IMAGE as builder
 WORKDIR /go/src/kubernetes-csi/external-attacher
 ADD . .
 ENV GOTOOLCHAIN auto
-ENV GOFLAGS="-buildvcs=false"
 RUN make build
 
 FROM $BASE_IMAGE
